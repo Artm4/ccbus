@@ -1,0 +1,13 @@
+* [done] Fix  @OneToMany(mappedBy="site",
+                  fetch = FetchType.LAZY, cascade = {CascadeType.ALL})
+          private List<Page> pages = null; - IGNORE IT
+* [done] Fix show correct log for current parsing entity because of error tracking.
+* [done] Fix @Entity
+      @Table(name = "options", indexes = {
+              @Index(columnList = "tag", name = "tag_idx"),
+              @Index(columnList = "option_key", name = "option_key_idx")
+      }) - Amend parser to parse inner {}
+* [done] Fix skip One To Many relation
+* [] Add import in generated Meta class if import from same package (ex. imported enum);
+* [done] Add OneToMany relation. Works only for field not method
+* [] Convert boolean to Boolean class for Meta

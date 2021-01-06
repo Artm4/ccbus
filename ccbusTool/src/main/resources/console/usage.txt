@@ -1,0 +1,37 @@
+NAME
+        ccbus tool - translate java component to react component
+
+SYNOPSIS
+        ccbus-tool [OPTION]... [FILE]
+
+DESCRIPTION
+        Translate UI component from java compilation unit to react unit.
+
+        Project environment is loaded from configuration file.
+
+        Compilation file path could be absolute or relative. Relative file is searched in following order: relative to working directory, relative to project src path, relative to package root path.
+
+OPTIONS
+        -c file, --config file
+              use the specified file or look for configCcbus.ini file in the installation directory
+
+        -g [file], --gen [file]
+              generate configuration template with file path or configCcbus.ini as file name in current working directory and exit
+
+        -i, --install
+              set up environment and exit
+
+        -s , --single
+              load single file, disables iterative generation.
+
+        -p, --print
+              output result to stdout
+
+        -h, --help
+              display this help and exit
+
+        -v, --version
+              output version information and exit
+
+
+

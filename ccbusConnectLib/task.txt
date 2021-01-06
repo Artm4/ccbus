@@ -1,0 +1,57 @@
+* [done]render function generate for all class types not only components
+* [done] add unnecessary new line for render definitions;
+* [done] Not supporting cascade calling like objA.getObjB().callObjBMethod() , callObjMethod will be not known.
+* [done] Cannot differentiate state name and method name:
+    // call expandDropDown() will be translated to this.state.expandDropDown, but should be this.expandDropDown
+    @State
+    boolean expandDropDown=false;
+    @StateEnd
+
+    void expandDropDown()
+    {
+        this.stateKey("expandDropDown",!this.expandDropDown);
+    }
+* [?] equals to === in javascript
+* [done] cannot expand state/props when argument in new expression
+* [done] class template parameter should be class type, same for methods
+* [done] extends class template remove template params from translation
+* [done] allow only single unit compilation, disable iterative
+* Custom serialization. Should return string as response and manually serialize
+    /*
+
+                  module.addSerializer(Date.class,new DateSerializer());
+                  module.addSerializer(DateTime.class,new DateTimeSerializer());
+                  mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                 */
+* Add Date serializer on server and Date deserializer in clinent
+    -To Serialize https://www.baeldung.com/jackson-serialize-dates
+    -To Deserialize on client :
+    Replace axios transformResponse with yours and manually call JSON.parse with reviver
+    https://mariusschulz.com/blog/deserializing-json-strings-as-javascript-date-objects
+    ##############################
+    const dateFormat = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+    function reviver(key, value) {
+      if (typeof value === "string" && dateFormat.test(value)) {
+        return new Date(value);
+      }
+
+      return value;
+    }
+
+    const text = '{ "date": "2016-04-26T18:09:16Z" }';
+    const obj = JSON.parse(text, reviver);
+
+    console.log(typeof obj.date);
+    // "object"
+    ##############################
+    OR
+    https://github.com/axios/axios/issues/430
+    Add custom transform in response and iterate to amend props
+    {
+        transformResponse: [].concat(
+            axios.defaults.transformResponse,
+            myTransformResponse,
+        ),
+    }
+

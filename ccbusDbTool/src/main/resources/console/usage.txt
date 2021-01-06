@@ -1,0 +1,36 @@
+NAME
+        ccbus orm database tool - generate meta information from JPA Entities
+
+SYNOPSIS
+        ccbus-dbtool [OPTION]... [FILE]
+
+DESCRIPTION
+        Generate meta information from JPA Entities.
+
+        Structure is presented as tree. Root is global single object. Entities are accessed from root as path.
+
+        Project environment is loaded from configuration file.
+
+        Compilation file path could be absolute or relative. Relative file is searched in following order: relative to working directory, relative to project src path, relative to package root path.
+
+OPTIONS
+        -c file, --config file
+              use the specified file or look for configCcbusDb.ini file in the installation directory
+
+        -g [file], --gen [file]
+              generate configuration template with file path or configCcbusDb.ini as file name in current working directory and exit
+
+        -s , --single
+              load single file, disables iterative generation.
+
+        -p, --print
+              output result to stdout
+
+        -h, --help
+              display this help and exit
+
+        -v, --version
+              output version information and exit
+
+
+

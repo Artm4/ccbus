@@ -1,0 +1,28 @@
+package ccbus.dbtool.intermediate.icodeimpl;
+
+import ccbus.dbtool.intermediate.ICodeNodeType;
+
+public enum ICodeNodeTypeImpl implements ICodeNodeType
+{
+    //Progrm structure
+    PROGRAM, CLASS, FUNCTION, CLASS_ROUTINE,
+    TABLE, TABLE_LIST, QUERY,
+
+    //Operands
+    VARIABLE, SUBSCRIPTS, FIELD, FIELD_LIST,
+    INTEGER_CONSTANT, REAL_CONSTANT,
+    STRING_CONSTANT, BOOLEAN_CONSTANT,
+    NOTATION,NOTATION_LIST, KEY_VALUE,
+    ENUM_CONSTANT, IMPORT, IMPORT_LIST,
+
+    //TYPE
+    TYPE,NAME,IDENTIFIER,TEMPLATE_LIST,TEMPLATE_TYPE_LIST,
+    CLASS_TYPE, IMPLEMENT_LIST, EXTEND_LIST,
+
+    //ACCESS
+    MODIFIER, MODIFIER_LIST ,
+
+    //STATEMENT
+    STATEMENT, VAR_DECLARATOR, VAR_ID;
+
+}

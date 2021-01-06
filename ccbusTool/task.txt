@@ -1,0 +1,36 @@
+1. [done] Use ServiceImpl instead ServiceHttp for react
+2. [done] Define serverPackage with service prefix instead web/service for server path
+3. [done] Apply point 1 for desktop
+4. [done] Implement react ServiceHttp with callback. Callback can be set on init or as compute param.
+5. [done] Remove correct prefix for server import path of Service. Ex. used in component
+6. [done] Set interface for service callback. Ex. used in component
+7. [done] Set type doc for service complete type
+7. [] Set type doc for component complete type
+8. [done] Allow entity inheritance.  Db tool to generate meta for base class.
+9. [] Payload to be typed. Cast type in view components to string and back to original.
+      Ex: text field, int to text, text to int
+10.[] Java service not prop init
+11.[done] Parser fails with {this} prefix in service example {complete()} works with {this.complete()}
+12.[done] Allow any payload annotation (fails for class annotation). Ignore annotation type if not known.
+13.[done] super should be called in constructor not overloaded constructor
+14.[] Make super() call more clever, detach/add when single/multi constructors.
+15.[] Make class look up in same package if class not imported, generate import declaration for client.
+16.[] Allow typeless lamda expression. Should be deduced from functor interface, but translator do not support it.
+17.[] Amend function "apply" to ecma "call" (call takes params seperately but ecma apply as array)
+18.[] Convert java Date to ecma Date (at the moment it is timestamp)
+19.[] Worker don't take method params
+20 [] Parse import like import 'react-tabs/style/react-tabs.css';
+
+        compute(){
+            long sessionId=session.sessionId
+        }
+21.[] Fix - change function callback from apply(par1,par2) to .call(null,par1,par2);
+
+1. Set Package name from config - done
+2. Import client packages - done
+3. Diff server/client packages - done
+4. Protect translation for services - done
+5. Make it working with client translator - done
+6. Deserialize payload - done
+7. Payload import package in client service not correct - done
+8. Payload constructors/methods not correct - done

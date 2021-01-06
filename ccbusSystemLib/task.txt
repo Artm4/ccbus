@@ -1,0 +1,12 @@
+* [done] Make run time check if path > 6 nodes, Db tool will limit the size to 6
+* [] Should optimize memory. Use light objects for Meta objects (fields and relation).
+    Could hash meta data and use node classes to build graph where meta data will be shared between nodes.
+* [] REVIEW the logic of whereOr whereAnd. whereClose not working as expected. whereAnd().whereOr().whereClose()
+    Not working code:
+    .whereOr()
+        .cmpLessThan(20L).par(Meta.Shape.id)
+        .whereAnd()
+            .cmpLessThan(21L).par(Meta.Shape.id)
+            .cmpLessThan(22L).par(Meta.Shape.id)
+        .whereClose()
+    .whereClose()

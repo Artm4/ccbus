@@ -1,0 +1,4 @@
+select
+from Activity field1 as f1, field2 as f2
+join Phone phone as ph1, name as nam
+join User user as name

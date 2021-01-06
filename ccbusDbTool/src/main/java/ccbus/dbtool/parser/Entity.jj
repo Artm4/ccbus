@@ -1,0 +1,847 @@
+/* Copyright (c) 2006, Sun Microsystems, Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright notice,
+ *       this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the Sun Microsystems, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived from
+ *       this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+options {
+  LOOKAHEAD = 1;
+  CHOICE_AMBIGUITY_CHECK = 2;
+  OTHER_AMBIGUITY_CHECK = 1;
+  STATIC = false;
+  DEBUG_PARSER = false;
+  DEBUG_LOOKAHEAD = false;
+  DEBUG_TOKEN_MANAGER = false;
+  ERROR_REPORTING = true;
+  JAVA_UNICODE_ESCAPE = false;
+  UNICODE_INPUT = false;
+  IGNORE_CASE = false;
+  USER_TOKEN_MANAGER = false;
+  USER_CHAR_STREAM = false;
+  BUILD_PARSER = true;
+  BUILD_TOKEN_MANAGER = true;
+  SANITY_CHECK = true;
+  FORCE_LA_CHECK = false;
+}
+
+PARSER_BEGIN(Entity)
+package ccbus.dbtool.parser;
+import ccbus.dbtool.frontend.Util;
+import ccbus.dbtool.intermediate.*;
+import ccbus.dbtool.intermediate.icodeimpl.*;
+
+import java.util.*;
+
+/** Simple brace matcher. */
+public class Entity implements Parser{
+    private Util util;
+    private ICode programCode;
+    private ICodeNodeClass currentCodeNodeClass;
+    private ICodeNodeNotationList currentCodeNodeNotationList=null;
+    private Stack<ICodeNodeClass> classStack= new Stack<ICodeNodeClass>();
+    private ITCodeNodeList<ICodeNodeImport> importList=ICodeFactory.createITCodeNodeImportList();
+    private HashMap<String,String> innerTypes=new HashMap();
+    String packageName="";
+
+    private static final Collection<String> relation=
+                Arrays.asList("ManyToMany",
+                        "ManyToOne",
+                        "OneToMany",
+                        "OneToOne"
+                );
+
+    public static boolean isRelation(String name)
+    {
+        return relation.contains(name);
+    }
+
+  /** Main entry point. */
+  public static void main(String args[]) throws ParseException {
+    Entity parser = new Entity(System.in);
+    parser.init();
+    parser.input();
+  }
+
+  public void init()
+  {
+     util=new Util(this);
+     programCode=ICodeFactory.createICode();
+  }
+
+  public ICode getProgramCode()
+  {
+    return programCode;
+  }
+
+  public Token currentToken()
+  {
+        return this.token;
+  }
+
+}
+
+
+
+PARSER_END(Entity)
+
+/** Root production. */
+
+SKIP :
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+}
+
+/* COMMENTS */
+
+MORE :
+{
+  "//" : IN_SINGLE_LINE_COMMENT
+|
+  <"/**" ~["/"]> { input_stream.backup(1); } : IN_FORMAL_COMMENT
+|
+  "/*" : IN_MULTI_LINE_COMMENT
+}
+
+<IN_SINGLE_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+  <SINGLE_LINE_COMMENT: "\n" | "\r" | "\r\n" > : DEFAULT
+}
+
+<IN_FORMAL_COMMENT>
+SPECIAL_TOKEN :
+{
+  <FORMAL_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_MULTI_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+  <MULTI_LINE_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_SINGLE_LINE_COMMENT,IN_FORMAL_COMMENT,IN_MULTI_LINE_COMMENT>
+MORE :
+{
+  < ~[] >
+}
+
+/* JAVA LITERALS */
+
+TOKEN :
+{
+  < INTEGER_LITERAL:
+        <DECIMAL_LITERAL> (["l","L"])?
+      | <HEX_LITERAL> (["l","L"])?
+      | <OCTAL_LITERAL> (["l","L"])?
+  >
+|
+  < #DECIMAL_LITERAL: ["1"-"9"] (["0"-"9"])* >
+|
+  < #HEX_LITERAL: "0" ["x","X"] (["0"-"9","a"-"f","A"-"F"])+ >
+|
+  < #OCTAL_LITERAL: "0" (["0"-"7"])* >
+|
+  < FLOATING_POINT_LITERAL:
+        (["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)? (["f","F","d","D"])?
+      | "." (["0"-"9"])+ (<EXPONENT>)? (["f","F","d","D"])?
+      | (["0"-"9"])+ <EXPONENT> (["f","F","d","D"])?
+      | (["0"-"9"])+ (<EXPONENT>)? ["f","F","d","D"]
+  >
+|
+  < #EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
+|
+  < CHARACTER_LITERAL:
+      "'"
+      (   (~["'","\\","\n","\r"])
+        | ("\\"
+            ( ["n","t","b","r","f","\\","'","\""]
+            | ["0"-"7"] ( ["0"-"7"] )?
+            | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+            )
+          )
+      )
+      "'"
+  >
+|
+  < STRING_LITERAL:
+      "\""
+      (   (~["\"","\\","\n","\r"])
+        | ("\\"
+            ( ["n","t","b","r","f","\\","'","\""]
+            | ["0"-"7"] ( ["0"-"7"] )?
+            | ["0"-"3"] ["0"-"7"] ["0"-"7"]
+            )
+          )
+      )*
+      "\""
+  >
+}
+
+TOKEN :
+{
+  < STATIC: "static" >
+  |
+  < FIELD_ACCESS: "abstract" | "final" | "public" | "private" | "protected">
+  |
+  < CLASS_IDENTIFIER: "class"|"interface"|"enum">
+  |
+  <IMPORT: "import">
+  |
+  <EXTENDS: "extends">
+  |
+  <PACKAGE: "package">
+  |
+  < HEADER: "import" | "package">
+  |
+  < TRUE: "true">
+  |
+  < FALSE: "false">
+  |
+  < NULL: "null">
+  |
+  < AT: "@">
+  |
+  < LEFT_BRACE: "{">
+  |
+  < RIGHT_BRACE: "}">
+  |
+  < LEFT_PAREN : "(">
+  |
+  < RIGHT_PAREN : ")">
+  |
+  < LEFT_BRACKET : "[">
+  |
+  < RIGHT_BRACKET : "]">
+  |
+  < SEMICOLON : ";">
+  |
+  < EQUALS : "=">
+  |
+  < LESS_THAN : "<">
+  |
+  < GREATER_THAN : ">">
+  |
+  < DOT : ".">
+  |
+  < COMMA : ",">
+  |
+  < IDENTIFIER: ["a"-"z","A"-"Z","-","_"] ( ["a"-"z","A"-"Z","0"-"9","-","_"] )* >
+  |
+  < UNEXPECTED: ~[]>
+}
+
+void input__():{}
+{
+  (methodDeclaration())*
+  <EOF>
+}
+
+void input():{}
+{
+  (decl())*
+  <EOF>
+}
+
+void decl():{}
+{
+  headerDecl()
+  |
+  classDecl()
+  |
+  notationDeclaration()
+}
+
+void classDecl():
+{
+    Token classType;
+}
+{
+  (fieldAccess())*
+  classType=<CLASS_IDENTIFIER>
+  identifier()
+  {
+     Token identifier=util.currentToken();
+      currentCodeNodeClass=ICodeFactory.createICodeNodeClass();
+      currentCodeNodeClass.setClassType(classType.image);
+      ICodeNodeClass prevClass=null;
+      String className=identifier.image;
+      if(!classStack.empty())
+        {
+            prevClass=classStack.peek();
+        }
+      if(null!=prevClass)
+      {
+          String innerClassName=className;
+          className=prevClass.getClassName()+"."+className;
+          innerTypes.put(innerClassName,className);
+      }
+      currentCodeNodeClass.setClassName(className);
+      currentCodeNodeClass.setNotationList(currentCodeNodeNotationList);
+      currentCodeNodeClass.setImportList(importList);
+      programCode.getRoot().addChild(currentCodeNodeClass);
+
+      // Push at the top of the stack.
+      classStack.add(currentCodeNodeClass);
+      if(classStack.size()==1)
+        {
+            String importDecl="import "+packageName+"."+className+";";
+            ICodeNodeImport importNode=ICodeFactory.createICodeNodeImport();
+            importNode.setName(importDecl);
+            importList.add(importNode);
+        }
+  }
+  (<EXTENDS> identifier()
+  {
+       Token baseToken=util.currentToken();
+       currentCodeNodeClass.setBaseName(baseToken.image);
+  }
+  )*
+  {
+      util.synchronize(EntityConstants.LEFT_BRACE);// consume implementation,extension
+      currentCodeNodeNotationList=null; // apply if any class notation and reset
+  }
+  classBody()
+  {
+    // Pop from the top of the stack. Recover currentClass if any on top.
+     classStack.pop();
+     if(!classStack.empty()) {
+          currentCodeNodeClass = classStack.peek();
+      }
+  }
+}
+
+void headerDecl():{}
+{
+    (<IMPORT>
+    {
+         String result="import ";
+         result=util.consumeBetweenOpenCloseAsString(currentToken().kind,EntityConstants.SEMICOLON,result);// consume package
+         result+=";";
+         ICodeNodeImport importNode=ICodeFactory.createICodeNodeImport();
+         importNode.setName(result);
+         importList.add(importNode);
+
+    }
+     semicolon()
+    )
+    |
+    (
+    <PACKAGE>
+    {
+        packageName=util.consumeBetweenOpenCloseAsString(currentToken().kind,EntityConstants.SEMICOLON,packageName);// consume package
+    }
+     semicolon()
+    )
+}
+
+void classBody():{}
+{
+    <LEFT_BRACE>
+    (
+        LOOKAHEAD( (fieldAccess())*
+                   <CLASS_IDENTIFIER> )
+        classDecl()
+        |
+        LOOKAHEAD( <STATIC> <LEFT_BRACE>)
+        staticBlockStatement()
+        |
+        blockStatement()
+        |
+        notationDeclaration()
+        |
+        memberDeclaration()
+    )*
+    <RIGHT_BRACE>
+}
+
+void notationDeclaration():
+{
+ICodeNodeKeyValue nodeKeyValue;
+}
+{
+    <AT>
+    identifier()
+    {
+        Token identifier=util.currentToken();
+        ICodeNodeNotation codeNodeNotation=ICodeFactory.createICodeNodeNotation();
+        codeNodeNotation.setNotationName(identifier.image);
+        if(null==currentCodeNodeNotationList)
+        {
+            currentCodeNodeNotationList=ICodeFactory.createICodeNodeNotationList();
+        }
+        currentCodeNodeNotationList.addNotation(codeNodeNotation);
+    }
+    (
+        <LEFT_PAREN>
+        nodeKeyValue=notationStatement()
+        {
+            codeNodeNotation.addNotationProperty(nodeKeyValue);
+        }
+        ( LOOKAHEAD(2)
+            <COMMA>
+            nodeKeyValue=notationStatement()
+            {
+                codeNodeNotation.addNotationProperty(nodeKeyValue);
+            }
+        )*
+        <RIGHT_PAREN>
+    )?
+}
+
+void memberDeclaration():{}
+{
+    (LOOKAHEAD( (fieldAccess())*
+                   typeIdentifierLookahead()
+                   identifier()
+                   <LEFT_PAREN> )
+    methodDeclaration()
+    |
+    LOOKAHEAD( fieldAccess() identifier() <LEFT_PAREN>)
+    constructorDeclaration()
+    |
+    LOOKAHEAD( (fieldAccess())*
+                      typeIdentifierLookahead()
+                      identifier())
+    classFieldDeclaration()
+    |
+    LOOKAHEAD( identifier())
+    enumFieldListDeclaration()
+    )
+    {
+            currentCodeNodeNotationList=null; // apply if any member notation and reset
+    }
+}
+
+void classFieldDeclaration():
+{
+    Token identifier;
+    ICodeNodeField node;
+    ICodeNodeTypeId codeNodeTypeDef;
+}
+{
+    (fieldAccess())*
+    codeNodeTypeDef=typeIdentifier()
+    identifier()
+    {
+             identifier=util.currentToken();
+             node=ICodeFactory.createICodeNodeField();
+             node.setFieldName(identifier.image);
+                 node.setNotationList(currentCodeNodeNotationList);
+             node.setFieldType(codeNodeTypeDef);
+             currentCodeNodeClass.getFieldList().addChild(node);
+
+    }
+    ( LOOKAHEAD(2) <COMMA> identifier()
+    {
+             identifier=util.currentToken();
+             node=ICodeFactory.createICodeNodeField();
+             node.setFieldName(identifier.image);
+             node.setNotationList(currentCodeNodeNotationList);
+             node.setFieldType(codeNodeTypeDef);
+             currentCodeNodeClass.getFieldList().addChild(node);
+    }
+    )*
+    {
+        util.synchronize(EntityConstants.SEMICOLON);// consume definition
+    }
+    semicolon()
+}
+
+void constructorDeclaration() : {}
+{
+  fieldAccess()
+  identifier()
+  parenthesesExpression()
+  {
+      util.synchronize(EntityConstants.LEFT_BRACE);// consume any throwable
+  }
+  blockStatement()
+}
+
+
+void methodDeclaration():
+{
+    Token identifier;
+    ICodeNodeField node;
+    ICodeNodeTypeId codeNodeTypeDef;
+}
+{
+    (fieldAccess())*
+    codeNodeTypeDef=typeIdentifier()
+    identifier()
+    {
+         identifier=util.currentToken();
+         if(identifier.image.startsWith("get"))
+         {
+             node = ICodeFactory.createICodeNodeField();
+             String name=identifier.image.substring(3);
+             if(name.length()>1)
+             {
+                 name=name.substring(0,1)+name.substring(1);
+             }
+             node.setFieldName(name);
+             node.setNotationList(currentCodeNodeNotationList);
+             node.setFieldType(codeNodeTypeDef);
+             if(null!=currentCodeNodeNotationList)
+             for(ICodeNode item:currentCodeNodeNotationList.getChildren())
+             {
+                 if(isRelation(((ICodeNodeNotation) item).getNotationName()))
+                 {
+                     currentCodeNodeClass.getFieldList().addChild(node);
+                     break;
+                 }
+             }
+         }
+    }
+    parenthesesExpression()
+    {
+        util.synchronize(EntityConstants.LEFT_BRACE);// consume any throwable
+    }
+    blockStatement()
+}
+
+void staticBlockStatement():{}
+{
+    <STATIC>
+    blockStatement()
+    {
+        currentCodeNodeNotationList=null; // reset notation
+    }
+}
+
+void blockStatement():{}
+{
+    <LEFT_BRACE>
+    {
+        util.consumeBetweenOpenClose(EntityConstants.LEFT_BRACE,EntityConstants.RIGHT_BRACE);
+        currentCodeNodeNotationList=null; // reset notation
+    }
+    <RIGHT_BRACE>
+}
+
+void parenthesesExpression():{}
+{
+    <LEFT_PAREN>
+    {
+        util.consumeBetweenOpenClose(EntityConstants.LEFT_PAREN,EntityConstants.RIGHT_PAREN);
+    }
+    <RIGHT_PAREN>
+}
+
+void enumFieldListDeclaration():
+{
+    ICodeNodeEnumConstant node;
+    ICodeNodeIdentifier identifier;
+}
+{
+    identifier=enumFieldDeclaration()
+    {
+        node=ICodeFactory.createICodeNodeEnumConstant();
+        node.setFieldName(identifier.getName());
+        node.setNotationList(currentCodeNodeNotationList);
+        currentCodeNodeClass.getFieldList().addChild(node);
+
+    }
+    (
+        LOOKAHEAD(2)
+        <COMMA>
+        identifier=enumFieldDeclaration()
+        {
+            node=ICodeFactory.createICodeNodeEnumConstant();
+            node.setFieldName(identifier.getName());
+            node.setNotationList(currentCodeNodeNotationList);
+            currentCodeNodeClass.getFieldList().addChild(node);
+
+        }
+    )*
+    (<COMMA>)?
+    (<SEMICOLON>)*
+}
+
+ICodeNodeIdentifier enumFieldDeclaration():
+{
+    Token token;
+    ICodeNodeIdentifier identifier=ICodeFactory.createICodeNodeIdentifier();
+}
+{
+    (
+        LOOKAHEAD(2)
+        identifier=routineCall()
+        |
+        identifier()
+        {
+            token=util.currentToken();
+            identifier.setName(token.image);
+        }
+    )
+    {
+        return identifier;
+    }
+}
+
+ICodeNodeIdentifier routineCall():
+{
+    ICodeNodeIdentifier identifier=ICodeFactory.createICodeNodeIdentifier();
+    Token token;
+}
+{
+    identifier()
+    {
+        token=util.currentToken();
+        identifier.setName(token.image);
+    }
+    <LEFT_PAREN>
+    {
+        util.consumeBetweenOpenClose(EntityConstants.LEFT_PAREN,EntityConstants.RIGHT_PAREN);
+    }
+    <RIGHT_PAREN>
+    {
+        return identifier;
+    }
+}
+
+
+void identifier():{}
+{
+    (
+        <IDENTIFIER>
+    )
+}
+
+void semicolon():{}
+{
+    (<SEMICOLON>)+
+}
+
+void fieldAccess():{}
+{
+    <FIELD_ACCESS> | <STATIC>
+}
+
+ICodeNodeTypeId typeIdentifier():
+{
+    ICodeNodeName nodeName;
+    ICodeNodeTypeId codeNodeTypeDef;
+    ICodeNodeTypeId codeNodeTypeDefTemplate;
+}
+{
+    (
+        nodeName=nameRet()
+        {
+            if(innerTypes.containsKey(nodeName.getLastName()))
+            {
+                nodeName.setFullName(innerTypes.get(nodeName.getLastName()));
+            }
+            Token identifier=util.currentToken();
+            codeNodeTypeDef=ICodeFactory.createICodeNodeTypeId();
+            codeNodeTypeDef.setName(nodeName);
+        }
+        (
+            <LESS_THAN>
+            codeNodeTypeDefTemplate=typeIdentifier()
+            {
+                codeNodeTypeDef.addTemplateParam(codeNodeTypeDefTemplate);
+            }
+            ( LOOKAHEAD(2)
+                <COMMA>
+                codeNodeTypeDefTemplate=typeIdentifier()
+                {
+                    codeNodeTypeDef.addTemplateParam(codeNodeTypeDefTemplate);
+                }
+            )*
+            <GREATER_THAN>
+        )?
+        ( <LEFT_BRACKET> <RIGHT_BRACKET> )*
+    )
+    {return codeNodeTypeDef;}
+}
+
+void typeIdentifierLookahead():{}
+{
+    name()
+    (
+        <LESS_THAN>
+        typeIdentifierLookahead()
+        ( LOOKAHEAD(2) <COMMA> typeIdentifierLookahead()
+        )*
+        <GREATER_THAN>
+    )?
+    ( <LEFT_BRACKET> <RIGHT_BRACKET> )*
+}
+
+ICodeNodeKeyValue notationStatement():
+{
+    ICodeNodeKeyValue nodeKeyValue=ICodeFactory.createICodeNodeKeyValue();
+    ICodeNodeName nodeName;
+    Token t;
+}
+{
+    (
+        LOOKAHEAD(name() <EQUALS>)
+        nodeKeyValue=assignmentStatement()
+        |
+        nodeName=nameRet()
+        {
+            nodeKeyValue.setValue(nodeName.getFullName());
+            nodeKeyValue.setKey("");
+        }
+        |
+        t=literal()
+        {
+            nodeKeyValue.setValue(t.image);
+            nodeKeyValue.setKey("");
+        }
+    )
+    {return nodeKeyValue;}
+}
+
+ICodeNodeKeyValue assignmentStatement():
+{
+Token t;
+ICodeNodeName nodeNameKey;
+ICodeNodeName nodeNameValue;
+ICodeNodeKeyValue nodeKeyValue=ICodeFactory.createICodeNodeKeyValue();
+}
+{
+    nodeNameKey=nameRet()
+    {
+        nodeKeyValue.setKey(nodeNameKey.getFullName());
+    }
+    <EQUALS>
+    (
+        LOOKAHEAD(<LEFT_BRACE>)
+        (
+            {
+                util.synchronize(EntityConstants.RIGHT_BRACE);// consume implementation,extension
+
+            }
+        )
+        (<RIGHT_BRACE>)
+        |
+        nodeNameValue=nameRet()
+        {
+            nodeKeyValue.setValue(nodeNameValue.getFullName());
+        }
+        |
+        t=literal()
+        {
+            nodeKeyValue.setValue(t.image);
+        }
+    )
+    {
+        return nodeKeyValue;
+    }
+}
+
+Token booleanLiteral() :
+{Token t;}
+{
+(
+  t=<TRUE>
+|
+  t=<FALSE>
+  )
+  {return t;}
+}
+
+Token nullLiteral() :
+{Token t;}
+{
+  t=<NULL>
+  {return t;}
+}
+
+Token literal() :
+{Token t;}
+{
+(
+  t=<INTEGER_LITERAL>
+|
+  t=<FLOATING_POINT_LITERAL>
+|
+  t=<CHARACTER_LITERAL>
+|
+  t=<STRING_LITERAL>
+|
+  t=booleanLiteral()
+|
+  t=nullLiteral()
+)
+{return t;}
+}
+
+void name() :
+/*
+ * A lookahead of 2 is required below since "Name" can be followed
+ * by a ".*" when used in the context of an "ImportDeclaration".
+ */
+{}
+{
+  identifier()
+  ( LOOKAHEAD(2) <DOT> identifier()
+  )*
+}
+
+ICodeNodeName nameRet() :
+/*
+ * A lookahead of 2 is required below since "Name" can be followed
+ * by a ".*" when used in the context of an "ImportDeclaration".
+ */
+{
+    ICodeNodeName nodeName=ICodeFactory.createICodeNodeName();
+}
+{
+  identifier()
+  {
+    ICodeNodeIdentifier nodeId=ICodeFactory.createICodeNodeIdentifier();
+    nodeId.setName(util.currentToken().image);
+    nodeName.addIdentifier(nodeId);
+  }
+  ( LOOKAHEAD(2) <DOT> (identifier() | <CLASS_IDENTIFIER>)
+    {
+        nodeId=ICodeFactory.createICodeNodeIdentifier();
+        nodeId.setName(util.currentToken().image);
+        nodeName.addIdentifier(nodeId);
+    }
+  )*
+  {return nodeName;}
+}
+
+void nameLookahead() :
+/*
+ * A lookahead of 2 is required below since "Name" can be followed
+ * by a ".*" when used in the context of an "ImportDeclaration".
+ */
+{}
+{
+  identifier()
+  ( LOOKAHEAD(2) <DOT> identifier()
+  )*
+}

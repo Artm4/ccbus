@@ -1,0 +1,11 @@
+.classpath
+.gitignore
+.mvn
+.project
+.settings
+.idea
+.vscode
+target
+*.iml
+pom.xml
+ignore-list
